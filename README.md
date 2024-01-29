@@ -20,6 +20,9 @@ cd chatprompt-sandbox
 
 You should fill out tokens that you want to use in ./backend/.env.template depending on integration choices and rename to .env
 
+### 4. localhost
+App should be running at default vite port of http://localhost:5173/
+
 
 ## Backend
 Uses [Hono](https://hono.dev/) with [Bun runtime](https://bun.sh/docs/cli/run).
