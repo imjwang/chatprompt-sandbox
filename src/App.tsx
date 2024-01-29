@@ -3,66 +3,98 @@ import { FakeListLLM } from "langchain/llms/fake";
 import { ConsoleCallbackHandler } from "langchain/callbacks"
 import { PromptTemplate } from "langchain/prompts";
 import toast, { Toaster } from 'react-hot-toast';
-import { CustomHandler } from "./handlers";
 
 
-const llm = new FakeListLLM({
-  responses: ["Duck", "Duck", "Moose", "Duck"], // responses are chosen at random
-  sleep: 5, // sets an increment in ms between chunks of stream or before response
-  callbacks: [new ConsoleCallbackHandler()]
-});
-
-const llmWithCallbackInConstructor = new FakeListLLM({
-  responses: ["Duck Duck Moose Duck Duck Duck Moose Duck Duck Duck Moose Duck Duck Duck Moose Duck"],
-  sleep: 10,
-  tags: ["test", "fake", "ducks"],
-  callbacks: [{
-    handleChainEnd: ({tags}) => toast(":')", tags) // using in constructor seems broken as of v0.0.213
-  }]
-});
-
-const llmwithCustomCallback = new FakeListLLM({
-  responses: ["Duck", "Duck", "Moose", "Duck"], // responses are chosen at random
-  sleep: 5, // sets an increment in ms between chunks of stream or before response
-  callbacks: [new CustomHandler()]
-});
+function Message({ role, content }: { role: string, content: string }) {
+  const color = role === "human" ? "bg-pink-300" : "bg-slate-300"
+  return (
+    <div className="p-4">
+      <div className={`tracking-tighter text-xs font-bold ${color} rounded-full size-fit py-1 px-2`}>
+        {role.toUpperCase()}
+      </div>
+      <p className="leading-7 [&:not(:first-child)]:my-2">
+        {content}
+      </p>
+      <div className="border-b" />
+    </div>
+  )
+}
 
 function App() {
   const [response, setResponse] = useState<string[]>([]);
+  const [history, setHistory] = useState<string[][]>([]);
+  const [message, setMessage] = useState<string>("");
 
-  const prompt = PromptTemplate.fromTemplate(`hi`)
-  const chain = prompt.pipe(llmWithCallbackInConstructor)
+  const handleMessageChange = (e: React.FocusEvent<HTMLInputElement>) => {
+    setMessage(e.target.value)
+  }
 
   const handleClick = async () => {
     setResponse([]);
-  //   const response = await chain.stream({}, {
-  //     tags: ["stream", "tag"], // these don't seem to work atm
-  //     callbacks: [{
-  //       handleLLMStart: ({tags}) => toast(":') LLM starting..."),
-  //       handleLLMEnd: () => toast("LLM ended :["),
-  //       handleChainStart: ({id}) => toast(`The Chain Train is entering a ${id ? id[2]: ""} :D`),
-  //       handleChainEnd: () => toast(`The Chain Train is leaving :O`)
-  //     }]
-  //   });
-    const response = await llmwithCustomCallback.stream("hi", {
-      callbacks: [new CustomHandler()]
+
+    const stream = await fetch("http://localhost:3000/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message,
+        sessionId: "2"
+      })
     })
-    for await (const chunk of response) {
-      setResponse(res => [...res, chunk]);
+
+    const reader = stream!.body!.getReader()
+    const decoder = new TextDecoder()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      setResponse((prev) => [...prev, decoder.decode(value)])
     }
+
+    const historyData = await fetch("http://localhost:3000/chat/history")
+    const historyJson = await historyData.json()
+    setHistory(historyJson)
+  }
+
+  const handleReset = async () => {
+    await fetch("http://localhost:3002/chat/history", { method: "DELETE" })
+
+    toast.custom(() => (
+      <div className="bg-red-500 text-white p-4 rounded-md">
+        Memory cleared!!
+      </div>
+    ))
+
+    setHistory([])
+    setResponse([])
   }
 
   return (
     <>
-    <div className="bg-slate-100 p-12 min-h-[30vh] max-h-[50vh] overflow-auto">
-      {response}
-    </div>
-    <div className="flex align-middle place-content-center py-2">
-      <button onClick={handleClick} className="bg-purple-400 px-4 py-2 rounded-sm hover:outline outline-slate-300 text-xl">
-        Click to Generate!
-      </button>
-    </div>
-    <Toaster />
+      <div className="grid grid-cols-2">
+        <div>
+          <div className="bg-slate-100 p-12 min-h-[30vh] max-h-[50vh] overflow-auto">
+            {response}
+          </div>
+          <div className="flex gap-2 align-middle place-content-center p-2">
+            <input className="hover:bg-slate-100 border-2 border-indigo-500 border-dashed px-4 w-full text-sm font-semibold" onBlur={handleMessageChange} />
+            <button onClick={handleClick} className="bg-purple-400 px-4 py-2 rounded-sm hover:outline outline-slate-300 text-xl">
+              Send
+            </button>
+            <button onClick={handleReset} className="bg-red-500 px-4 py-2 rounded-sm hover:outline outline-slate-300 text-xl">
+              Reset
+            </button>
+          </div>
+        </div>
+        <div className="p-4">
+          {
+            history.map((h, i) => (
+              <Message key={i} role={h[0]} content={h[1]} />
+            ))
+          }
+        </div>
+      </div>
+      <Toaster />
     </>
   )
 }
