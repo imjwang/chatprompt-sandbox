@@ -57,7 +57,7 @@ function App() {
   }
 
   const handleReset = async () => {
-    await fetch("http://localhost:3002/chat/history", { method: "DELETE" })
+    await fetch("http://localhost:3000/chat/history", { method: "DELETE" })
 
     toast.custom(() => (
       <div className="bg-red-500 text-white p-4 rounded-md">

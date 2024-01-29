@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "dev": "bun run --hot src/index.ts"
+  },
+  "dependencies": {
+    "@langchain/cohere": "^0.0.2",
+    "cohere-ai": "^7.7.3",
+    "hono": "^3.12.7",
+    "langchain": "^0.1.9"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.0.0"
+  }
+}
