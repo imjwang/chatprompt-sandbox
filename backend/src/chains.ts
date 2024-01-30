@@ -61,18 +61,59 @@ export class CohereChat {
     return await this.memory.clear()
   }
 
+  setMessages(messages: BaseMessage[]) {
+    this.memory = new ChatMessageHistory(messages)
+  }
+
   async stream({ input }: StreamInput) {
     const res = await this.chainWithHistory.stream({ input })
     return res
   }
 
-  async loadMessages(uid: string) {
+  async restoreConversation(id: string) {
     const keys = []
-    for await (const k of this.store.yieldKeys(`message:${uid}`)) {
+    for await (const k of this.store.yieldKeys(`message:${id}`)) {
       keys.push(k)
     }
     const messages = await this.store.mget(keys)
     this.memory = new ChatMessageHistory(messages)
     return messages
+  }
+
+  async saveMessages(id: string) {
+    const messages = await this.getMessages()
+    if (!messages) return "no messages"
+    await this.store.mset(
+      messages.map((msg, idx) => [`message:${id}:id:${idx}`, msg])
+    )
+    return "ok"
+  }
+
+  async deleteConversation(id: string) {
+    const msgKeys = []
+    for await (const msg of this.store.yieldKeys(`message:${id}`)) {
+      msgKeys.push(msg)
+    }
+    await this.store.mdelete(msgKeys)
+    await this.clearMessages()
+    return msgKeys
+  }
+
+
+  async regenerateAt(idx: number) {
+    const messages = await this.getMessages()
+    const messageHistory = messages.slice(0, idx)
+    const currentMessage = messages[idx]
+
+    this.setMessages(messageHistory)
+    return await this.stream({ input: currentMessage.content as string })
+  }
+
+  async editAt(idx: number, message: string) {
+    const messages = await this.getMessages()
+    const historySlice = messages.slice(0, idx)
+
+    this.setMessages(historySlice)
+    return await this.stream({input: message})
   }
 }

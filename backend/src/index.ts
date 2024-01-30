@@ -25,30 +25,8 @@ app.post('/chat', async (c) => {
   })
 })
 
-app.put('/chat', async (c) => {
-  const { uid } = await c.req.json()
-  const messages = await chain.getMessages()
-
-  await store.mset(
-    messages.map((msg, idx) => [`message:${uid}:id:${idx}`, msg])
-  )
-
-  return c.json({ status: "ok" })
-})
-
-app.get('/chat/:id', async (c) => {
-  const id = c.req.param('id')
-  const messages = await chain.loadMessages(id)
-  const res = []
-  for (const msg of messages) {
-   res.push([msg._getType(), msg.content])
-  }
-  return c.json(res)
-})
-
 app.get('/history', async (c) => {
   const messages = await chain.getMessages()
-
   const res = []
   for (const msg of messages) {
    res.push([msg._getType(), msg.content])
@@ -62,12 +40,53 @@ app.delete('/history', async (c) => {
   return c.json({ status: "ok"})
 })
 
-app.get('/ids', async (c) => {
+app.get('/conversation', async (c) => {
   const yieldedKeys = [];
-for await (const key of store.yieldKeys("message")) {
-  yieldedKeys.push(key);
-}
+  for await (const key of store.yieldKeys("message")) {
+    yieldedKeys.push(key);
+  }
   return c.json({ yieldedKeys })
+})
+
+app.put('/conversation', async (c) => {
+  const { id } = await c.req.json()
+  const status = await chain.saveMessages(id)
+
+  return c.json({ status })
+})
+
+app.delete('/conversation/:id', async (c) => {
+  const id = await c.req.param('id')
+  const delIds = await chain.deleteConversation(id)
+
+  return c.json({ status: "deleted", ids: delIds })
+})
+
+app.get('/conversation/:id', async (c) => {
+  const id = c.req.param('id')
+  const messages = await chain.restoreConversation(id)
+  const res = []
+  for (const msg of messages) {
+   res.push([msg._getType(), msg.content])
+  }
+  return c.json(res)
+})
+
+app.get('/chat/:idx', async (c) => {
+  const idx = await c.req.param('idx')
+  const lcstream = await chain.regenerateAt(+idx)
+  return stream(c, async (stream) => {
+    await stream.pipe(lcstream)
+  })
+})
+
+app.post('/edit/:idx', async (c) => {
+  const idx = await c.req.param('idx')
+  const { message } = await c.req.json()
+  const lcstream = await chain.editAt(+idx, message)
+  return stream(c, async (stream) => {
+    await stream.pipe(lcstream)
+  })
 })
 
 export default {
