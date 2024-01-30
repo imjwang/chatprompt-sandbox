@@ -2,9 +2,14 @@ import { Hono } from 'hono'
 import { stream, streamText } from "hono/streaming"
 import { cors } from 'hono/cors'
 import { CohereChat } from './chains'
+import { InMemoryStore } from "langchain/storage/in_memory";
 
 
 const app = new Hono()
+
+
+const store = new InMemoryStore();
+const chain = new CohereChat(store)
 
 app.use("/*", cors())
 
@@ -12,19 +17,37 @@ app.get('/', (c) => {
   return c.text('Hello Hono!')
 })
 
-const Chain = new CohereChat()
-
 app.post('/chat', async (c) => {
   const { message } = await c.req.json()
-  const lcstream = await Chain.stream({input: message})
+  const lcstream = await chain.stream({input: message})
   return stream(c, async (stream) => {
     await stream.pipe(lcstream)
   })
 })
 
+app.put('/chat', async (c) => {
+  const { uid } = await c.req.json()
+  const messages = await chain.getMessages()
 
-app.get('/chat/history', async (c) => {
-  const messages = await Chain.getMessages()
+  await store.mset(
+    messages.map((msg, idx) => [`message:${uid}:id:${idx}`, msg])
+  )
+
+  return c.json({ status: "ok" })
+})
+
+app.get('/chat/:id', async (c) => {
+  const id = c.req.param('id')
+  const messages = await chain.loadMessages(id)
+  const res = []
+  for (const msg of messages) {
+   res.push([msg._getType(), msg.content])
+  }
+  return c.json(res)
+})
+
+app.get('/history', async (c) => {
+  const messages = await chain.getMessages()
 
   const res = []
   for (const msg of messages) {
@@ -34,9 +57,17 @@ app.get('/chat/history', async (c) => {
   return c.json(res)
 })
 
-app.delete('/chat/history', async (c) => {
-  await Chain.clearMessages()
+app.delete('/history', async (c) => {
+  await chain.clearMessages()
   return c.json({ status: "ok"})
+})
+
+app.get('/ids', async (c) => {
+  const yieldedKeys = [];
+for await (const key of store.yieldKeys("message")) {
+  yieldedKeys.push(key);
+}
+  return c.json({ yieldedKeys })
 })
 
 export default {
