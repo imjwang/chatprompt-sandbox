@@ -28,7 +28,6 @@ app.post('/chat', async (c) => {
 app.get('/history', async (c) => {
   const messages = await chain.getMessages()
   const res = []
-  console.log("histotoy", messages)
   for (const msg of messages) {
    res.push([msg._getType(), msg.content])
   }
