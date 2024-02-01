@@ -3,12 +3,12 @@
     "dev": "bun run --hot src/index.ts"
   },
   "dependencies": {
-    "@langchain/cohere": "^0.0.2",
-    "cohere-ai": "^7.7.3",
-    "hono": "^3.12.7",
-    "langchain": "^0.1.9"
+    "@langchain/cohere": "^0.0.3",
+    "cohere-ai": "^7.7.4",
+    "hono": "^3.12.9",
+    "langchain": "^0.1.11"
   },
   "devDependencies": {
-    "@types/bun": "^1.0.0"
+    "@types/bun": "^1.0.4"
   }
 }
